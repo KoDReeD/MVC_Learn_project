@@ -89,6 +89,7 @@ public class PostgreDbRepository<T> : IDbRepository<T> where T : class
             {
                 await _db.Set<T>().Include(navigationProperty.Name).LoadAsync();
             }
+
             list = await _db.Set<T>().ToListAsync();
         }
         catch (Exception e)
@@ -96,6 +97,7 @@ public class PostgreDbRepository<T> : IDbRepository<T> where T : class
             Console.WriteLine(e);
             throw;
         }
+
         return list;
     }
 
@@ -119,6 +121,7 @@ public class PostgreDbRepository<T> : IDbRepository<T> where T : class
             Console.WriteLine(e);
             throw;
         }
+
         return entity;
     }
 }

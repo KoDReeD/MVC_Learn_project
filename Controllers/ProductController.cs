@@ -4,118 +4,157 @@ using WebStore.Models;
 using WebStore.Services.Implements;
 using System.IO;
 using System.Net;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using WebStore.Models.ViewModels;
+using WebStore.Services;
 
 namespace WebStore.Controllers;
 
 public class ProductController : Controller
 {
-    private readonly ApplicationDbContext _db;
-    private readonly IDbRepository<Product> _dataRepository;
+    private readonly ApplicationDbContext _dbContext;
+
+    private readonly IDbRepository<Product> _productRepository;
+    private readonly IDbRepository<Category> _categoryRepository;
+    private readonly IDbRepository<ApplicationType> _appTypeRepository;
+
+    private ProductVM _productVm { get; set; }
+
+    private static Account account = new Account(
+        "dhycgaecf",
+        "526295216313516",
+        "FLy0PItXvBx83J6uA8lGguD8mzo");
+
+    private static Cloudinary cloudinary = new Cloudinary(account);
 
     // GET
-    public ProductController(ApplicationDbContext db)
+    public ProductController(ApplicationDbContext dbContext)
     {
-        _db = db;
-        _dataRepository = new PostgreDbRepository<Product>(_db);
+        _dbContext = dbContext;
+
+        _productRepository = new PostgreDbRepository<Product>(Helper.GetContext());
+        _appTypeRepository = new PostgreDbRepository<ApplicationType>(Helper.GetContext());
+        _categoryRepository = new PostgreDbRepository<Category>(Helper.GetContext());
     }
 
-    public async Task<IActionResult> Index()
+    public async Task InitProduct(int id)
     {
-        var list = await _dataRepository.GetJoinAllEntiesAsync();
-        return View(list);
-    }
+        var categoriesTask = _categoryRepository.GetAllAsync();
+        var applicationsTask = _appTypeRepository.GetAllAsync();
 
-    public async Task<IActionResult> AddEdit(int id)
-    {
-        if (id <= 0)
+        Task<Product>? productTask = id != 0 ? _productRepository.GetJoinEntiesByIdAsync(id) : null;
+
+        if (id != 0)
         {
-            return NotFound();
+            await Task.WhenAll(productTask, categoriesTask, applicationsTask);
         }
-        Task<Product> productTask = _dataRepository.GetJoinEntiesByIdAsync(id);
-        var categoriesTask = new PostgreDbRepository<Category>(_db).GetAllAsync();
-        var applicationsTask = new PostgreDbRepository<ApplicationType>(_db).GetAllAsync();
-
-        await Task.WhenAll(productTask, categoriesTask, applicationsTask);
-
-        ProductVM productVm = new ProductVM()
+        else
         {
-            Product = productTask.Result,
-            AplicationSelectList = categoriesTask.Result.Select(x => new SelectListItem
+            await Task.WhenAll(categoriesTask, applicationsTask);
+        }
+
+        Product product = productTask == null ? new Product() : productTask.Result;
+        
+        _productVm = new ProductVM()
+        {
+            Product = product,
+            
+            AplicationSelectList = applicationsTask.Result.Select(x => new SelectListItem
             {
                 Text = x.Title,
                 Value = x.Id.ToString()
             }),
-            CategorySelectList = applicationsTask.Result.Select(x => new SelectListItem
+            CategorySelectList = categoriesTask.Result.Select(x => new SelectListItem
             {
                 Text = x.Title,
                 Value = x.Id.ToString()
             })
         };
-            
-        return View(productVm);
-        // string accountId = "FW25bXv";
-        // string url = $"https://api.upload.io/v2/accounts/{accountId}/uploads/binary";
-        //
-        // var client = new HttpClient();
-        // client.DefaultRequestHeaders.Add("Authorization", "Bearer public_FW25bXv5ssPk8WyPWL2aUmV1CR3N");
-        //
-        // var filePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Downloads\\" +
-        //                "GitHub.png";
-        // var fileBytes = System.IO.File.ReadAllBytes(filePath);
-        // var content = new ByteArrayContent(fileBytes);
-        //
-        // if (Path.GetExtension(filePath).ToLower() == ".png")
-        // {
-        //     content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
-        // }
-        // else if (Path.GetExtension(filePath).ToLower() == ".jpeg" || Path.GetExtension("path/to/image").ToLower() == ".jpg")
-        // {
-        //     content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-        // }
-        //
-        // var response =
-        //     await client.PostAsync("https://api.upload.io/v2/accounts/FW25bXv/uploads/binary?folderPath=/uploads",
-        //         content);
-        // var json = await response.Content.ReadAsStringAsync();
-        // JObject responseObject = JObject.Parse(json);
-        // string path = (string)responseObject["filePath"]
+
+        _productVm.OldPhotoPath = product.photoPath;
     }
 
-    [HttpPost]
-    public IActionResult AddEdit(ProductVM productVm)
+    //отображение view
+    public async Task<IActionResult> Index()
     {
+        var list = await _productRepository.GetJoinAllEntiesAsync();
+        return View(list);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> AddEdit(int id)
+    {
+        if (id < 0)
+        {
+            return NotFound();
+        }
+        
+        await InitProduct(id);
+        
+        return View(_productVm);
+    }
+    
+    
+
+
+    [HttpPost]
+    public async Task<IActionResult> AddEdit(ProductVM productVm)
+    {
+        ModelState.Remove("CategorySelectList");
+        ModelState.Remove("AplicationSelectList");
+        ModelState.Remove("Product.Category");
+        ModelState.Remove("Product.Application");
+        
         if (!ModelState.IsValid)
         {
+            await InitProduct(productVm.Product.Id);
             return View(productVm);
         }
+
+        string newPhotoPath = productVm.Product.photoPath;
+
+        var photo = HttpContext.Request.Form.Files;
+
+        // if (productVm.Product.photoPath != productVm.oldPhotoUrl)
+        // {
+        //     //  ДОБАВИЛИ ФОТО
+        //     if (oldPhotoPath == null && newPhotoPath != null)
+        //     {
+        //         
+        //     }
+        //     //  УДАЛИЛИ ФОТО
+        //     else if (oldPhotoPath != null && newPhotoPath == null)
+        //     {
+        //         
+        //     }
+        //     //  ИЗМЕНИЛИ ФОТО
+        //     else if (oldPhotoPath != null && newPhotoPath != null)
+        //     {
+        //         
+        //     }
+        // }
+        
+
 
         //  СОЗДАЁМ
         if (productVm.Product.Id == 0)
         {
-            
         }
         //  РЕДАКТИРУЕМ
         else
         {
-            
         }
+
+        return View();
     }
 
     public async Task<IActionResult> Delete()
     {
-        // string accountId = "FW25bXv";
-        // string url = $"https://api.upload.io/v2/accounts/{accountId}/files?filePath=/uploads/file-6rjF.txt";
-        //
-        // var client = new HttpClient();
-        // client.DefaultRequestHeaders.Add("Authorization", "Bearer secret_FW25bXv77j4Xpq5xPL7rrNdohFtR");
-        // var response =
-        //     await client.DeleteAsync(url);
-        // var json = await response.Content.ReadAsStringAsync();
-        //
-
         return View();
     }
 }

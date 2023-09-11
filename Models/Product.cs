@@ -28,8 +28,8 @@ public class Product
     public int ApplicationId { get; set; }
 
     [ForeignKey("CategoryId")]
-    public Category Category { get; set; }
+    public virtual Category Category { get; set; }
     
     [ForeignKey("ApplicationId")]
-    public ApplicationType Application { get; set; }
+    public virtual ApplicationType Application { get; set; }                                                                                                                                  
 }
