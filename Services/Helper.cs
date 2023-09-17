@@ -19,4 +19,6 @@ public static class Helper
         
         return new ApplicationDbContext(options);
     }
+
+    public static ConfigurationManager Config { get; set; }
 }

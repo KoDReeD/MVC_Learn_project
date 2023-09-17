@@ -25,12 +25,7 @@ public class ProductController : Controller
 
     private ProductVM _productVm { get; set; }
 
-    private static Account account = new Account(
-        "dhycgaecf",
-        "526295216313516",
-        "FLy0PItXvBx83J6uA8lGguD8mzo");
-
-    private static Cloudinary cloudinary = new Cloudinary(account);
+    private IPhotoHost _photoHost = new CloudinaryPhotoHost();
 
     // GET
     public ProductController(ApplicationDbContext dbContext)
@@ -59,11 +54,11 @@ public class ProductController : Controller
         }
 
         Product product = productTask == null ? new Product() : productTask.Result;
-        
+
         _productVm = new ProductVM()
         {
             Product = product,
-            
+
             AplicationSelectList = applicationsTask.Result.Select(x => new SelectListItem
             {
                 Text = x.Title,
@@ -93,14 +88,11 @@ public class ProductController : Controller
         {
             return NotFound();
         }
-        
+
         await InitProduct(id);
-        
+
         return View(_productVm);
     }
-    
-    
-
 
     [HttpPost]
     public async Task<IActionResult> AddEdit(ProductVM productVm)
@@ -109,37 +101,43 @@ public class ProductController : Controller
         ModelState.Remove("AplicationSelectList");
         ModelState.Remove("Product.Category");
         ModelState.Remove("Product.Application");
-        
+
         if (!ModelState.IsValid)
         {
             await InitProduct(productVm.Product.Id);
             return View(productVm);
         }
-
-        string newPhotoPath = productVm.Product.photoPath;
-
-        var photo = HttpContext.Request.Form.Files;
-
-        // if (productVm.Product.photoPath != productVm.oldPhotoUrl)
-        // {
-        //     //  ДОБАВИЛИ ФОТО
-        //     if (oldPhotoPath == null && newPhotoPath != null)
-        //     {
-        //         
-        //     }
-        //     //  УДАЛИЛИ ФОТО
-        //     else if (oldPhotoPath != null && newPhotoPath == null)
-        //     {
-        //         
-        //     }
-        //     //  ИЗМЕНИЛИ ФОТО
-        //     else if (oldPhotoPath != null && newPhotoPath != null)
-        //     {
-        //         
-        //     }
-        // }
         
-
+        string curPhoto = productVm.Product.photoPath;
+        string oldPhoto = productVm.OldPhotoPath;
+        
+        //  Изменение фото
+        if (curPhoto != oldPhoto)
+        {
+            //  Файл который выбрали во view
+            var file = HttpContext.Request.Form.Files.FirstOrDefault();
+            
+            //  Удалили
+            if (curPhoto == null && oldPhoto != null)
+            {
+                string photoPath = _photoHost.GetPhotoName(oldPhoto);
+                bool deleteFlag = _photoHost.DeletePhoto(photoPath);
+            }
+            //  Добавили
+            else if (curPhoto != null && oldPhoto == null)
+            {
+                var photoUrl = _photoHost.UploadPhoto(file);
+                if (photoUrl == null)
+                {
+                    
+                }
+            }
+            //  Изменение
+            else if(curPhoto != null && oldPhoto != null)
+            {
+                
+            }
+        }
 
         //  СОЗДАЁМ
         if (productVm.Product.Id == 0)
@@ -150,7 +148,7 @@ public class ProductController : Controller
         {
         }
 
-        return View();
+        return View("Index");
     }
 
     public async Task<IActionResult> Delete()

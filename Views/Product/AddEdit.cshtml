@@ -171,17 +171,18 @@
         
         if (file) {
             divImage.style.display = 'block';
-                    // Создаем объект FileReader
-                    const reader = new FileReader();
+            Model.Product.photoPath = "photo";
+            // Создаем объект FileReader
+            const reader = new FileReader();
         
-                    // Устанавливаем обработчик загрузки файла
-                    reader.onload = function(e) {
-                        // Устанавливаем src атрибут тега <img> в выбранное изображение
-                        previewImage.setAttribute('src', e.target.result);
-                    }
-                    // Читаем файл в формате Data URL
-                    reader.readAsDataURL(file);
-                }
+            // Устанавливаем обработчик загрузки файла
+            reader.onload = function(e) {
+            // Устанавливаем src атрибут тега <img> в выбранное изображение
+            previewImage.setAttribute('src', e.target.result);
+            }
+            // Читаем файл в формате Data URL
+            reader.readAsDataURL(file);
+            }
     });
     
     // Добавляем обработчик события 'click'
